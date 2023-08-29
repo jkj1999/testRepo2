@@ -103,13 +103,15 @@ class NWKernelRegression(nn.Module):
                          values.unsqueeze(-1)).reshape(-1)
 
 # train
-# X_tile的形状:(n_train,n_train)，每一行都包含着相同的训练输入
+# 任何一个训练样本的输入都会和除自己以外的所有训练样本的“键-值”对进行计算，从而得到其对应的预测输出
+
+# X_tile的形状:(n_train,n_train)，行与行之间相同，包括所有训练输入
 X_tile = x_train.repeat((n_train, 1))
-# Y_tile的形状:(n_train，n_train)，每一行都包含着相同的训练输出
+# Y_tile的形状:(n_train，n_train)，行与行之间相同，包括所有训练输出
 Y_tile = y_train.repeat((n_train, 1))
-# keys的形状:('n_train','n_train'-1)
+# keys的形状:('n_train','n_train'-1) 每n行缺少X_tile矩阵的第n个元素
 keys = X_tile[(1 - torch.eye(n_train)).type(torch.bool)].reshape((n_train, -1))
-# values的形状:('n_train','n_train'-1)
+# values的形状:('n_train','n_train'-1) 每n行缺少Y_tile矩阵的第n个元素
 values = Y_tile[(1 - torch.eye(n_train)).type(torch.bool)].reshape((n_train, -1))
 
 net = NWKernelRegression()
@@ -121,15 +123,19 @@ for epoch in range(5):
     trainer.zero_grad()
     l = loss(net(x_train, keys, values), y_train)
     l.sum().backward()
-    trainer.step()
+    trainer.step() # 使用优化器执行一步参数更新
     print(f'epoch {epoch + 1}, loss {float(l.sum()):.6f}')
     animator.add(epoch + 1, float(l.sum()))
-d2l.plt.show()
+d2l.plt.show() # show animator
 
 # keys的形状:(n_test，n_train)，每一行包含着相同的训练输入（例如，相同的键）
 keys = x_train.repeat((n_test, 1))
 # value的形状:(n_test，n_train)
 values = y_train.repeat((n_test, 1))
+# tensor.unsqueeze() 将张量维度扩展
+# tensor.detach() 使张量不再具有梯度信息，减少内存消耗，加快计算
 y_hat = net(x_test, keys, values).unsqueeze(1).detach()
 plot_kernel_reg(y_hat)
 d2l.plt.show()
+
+# 注:模型是使用train_set进行回归训练，然后使用训练好的模型拟合test_set
